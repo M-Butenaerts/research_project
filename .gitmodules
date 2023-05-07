@@ -22,3 +22,6 @@
 [submodule "lib/HerbExamples.jl"]
 	path = lib/HerbExamples.jl
 	url = https://github.com/Herb-AI/HerbExamples.jl.git
+[submodule "lib/HerbGrammar.jl"]
+	path = lib/HerbGrammar.jl
+	url = https://github.com/Herb-AI/HerbGrammar.jl.git
