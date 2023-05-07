@@ -1,3 +1,6 @@
 [submodule "lib/Herb.jl"]
 	path = lib/Herb.jl
 	url = https://github.com/Herb-AI/Herb.jl.git
+[submodule "lib/HerbBenchmark.jl"]
+	path = lib/HerbBenchmark.jl
+	url = https://github.com/Herb-AI/HerbBenchmarks.jl.git
