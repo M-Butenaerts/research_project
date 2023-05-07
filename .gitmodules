@@ -13,3 +13,6 @@
 [submodule "lib/HerbSearch.jl"]
 	path = lib/HerbSearch.jl
 	url = https://github.com/Herb-AI/HerbSearch.jl.git
+[submodule "lib/HerbUtils.jl"]
+	path = lib/HerbUtils.jl
+	url = https://github.com/Herb-AI/HerbUtils.jl.git
