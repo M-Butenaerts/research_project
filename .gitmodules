@@ -7,3 +7,6 @@
 [submodule "lib/HerbConstraints.jl"]
 	path = lib/HerbConstraints.jl
 	url = https://github.com/Herb-AI/HerbConstraints.jl.git
+[submodule "lib/HerbData.jl"]
+	path = lib/HerbData.jl
+	url = https://github.com/Herb-AI/HerbData.jl.git
