@@ -1,4 +1,4 @@
-using HTTP, JSON, DataFrames
+using HTTP, JSON, DataFrames, OpenML, CSV
 
 function get_info(dataset_id::Int64) 
 
@@ -66,3 +66,25 @@ function get_info(dataset_id::Int64)
 end
 
 
+function get_dataset(dataset_id::Int64)
+    # Get the data itself as a dataframe
+    table = OpenML.load(dataset_id)
+    df = DataFrame(table)
+    return df
+end
+
+function get_dataset_info(dataset_id::Int64)
+    # Get dataset by ID
+    OpenML.describe_dataset(dataset_id)
+end
+
+function save_dataset_to_csv(filename::String, df::DataFrame)
+    path = dirname(pwd()) * "\\research_project\\Datasets\\" * filename * ".csv"
+    CSV.write(path, df)
+end
+
+function read_dataset_from_csv(filename::String)
+    path = dirname(pwd()) * "\\research_project\\Datasets\\" * filename * ".csv"
+    df = DataFrame(CSV.File(path))
+    return df
+end
