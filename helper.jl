@@ -118,3 +118,12 @@ function get_simple_datasets()
 
     return dataset_list
 end
+
+function get_dataset_metadata(df::DataFrame)
+    return describe(df)
+end
+
+function get_unique_classes_dataset(df::DataFrame)
+    unique_values = unique(df[:, end])
+    return length(unique_values)
+end
