@@ -88,3 +88,33 @@ function read_dataset_from_csv(filename::String)
     df = DataFrame(CSV.File(path))
     return df
 end
+
+# Iris: 61, Seeds: 1499, Blood transfusion: 1464, Monks: 334, Diabetes: 37, ilpd: 1480
+function get_simple_datasets()
+    # Load the iris DF.
+    iris_table = OpenML.load(61)
+    iris_df = DataFrame(iris_table)
+    dataset_list = [iris_df]
+    # Load the seeds DF.
+    seeds_table = OpenML.load(1499)
+    seeds_df = DataFrame(seeds_table)
+    push!(dataset_list, seeds_df)
+    # Load the Blood transfusion DF.
+    bt_table = OpenML.load(1464)
+    bt_df = DataFrame(bt_table)
+    push!(dataset_list, bt_df)
+    # Load the Monks DF.
+    monks_table = OpenML.load(334)
+    monks_df = DataFrame(monks_table)
+    push!(dataset_list, monks_df)
+    # Load the Diabetes DF.
+    diabetes_table = OpenML.load(37)
+    diabetes_df = DataFrame(diabetes_table)
+    push!(dataset_list, diabetes_df)
+    # Load the ilpd DF.
+    ilpd_table = OpenML.load(1480)
+    ilpd_df = DataFrame(ilpd_table)
+    push!(dataset_list, ilpd_df)
+
+    return dataset_list
+end
