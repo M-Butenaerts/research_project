@@ -123,7 +123,24 @@ function get_dataset_metadata(df::DataFrame)
     return describe(df)
 end
 
-function get_unique_classes_dataset(df::DataFrame)
+function get_amount_classes_dataset(df::DataFrame)
     unique_values = unique(df[:, end])
     return length(unique_values)
+end
+
+function get_amount_features_dataset(df::DataFrame)
+    description = describe(df)
+    return size(description, 1) - 1
+end
+
+function get_feature_types_dataset(df::DataFrame)
+    description = describe(df)
+    features = description[:, end]
+    return features[1:end-1, :]
+end
+
+function get_class_type_dataset(df::DataFrame)
+    description = describe(df)
+    features = description[:, end]
+    return features[size(features,1), :]
 end
