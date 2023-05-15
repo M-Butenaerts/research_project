@@ -1,0 +1,27 @@
+[submodule "lib/Herb.jl"]
+	path = lib/Herb.jl
+	url = https://github.com/Herb-AI/Herb.jl.git
+[submodule "lib/HerbBenchmark.jl"]
+	path = lib/HerbBenchmark.jl
+	url = https://github.com/Herb-AI/HerbBenchmarks.jl.git
+[submodule "lib/HerbConstraints.jl"]
+	path = lib/HerbConstraints.jl
+	url = https://github.com/Herb-AI/HerbConstraints.jl.git
+[submodule "lib/HerbData.jl"]
+	path = lib/HerbData.jl
+	url = https://github.com/Herb-AI/HerbData.jl.git
+[submodule "lib/HerbSearch.jl"]
+	path = lib/HerbSearch.jl
+	url = https://github.com/Herb-AI/HerbSearch.jl.git
+[submodule "lib/HerbUtils.jl"]
+	path = lib/HerbUtils.jl
+	url = https://github.com/Herb-AI/HerbUtils.jl.git
+[submodule "lib/HerbEvaluation.jl"]
+	path = lib/HerbEvaluation.jl
+	url = https://github.com/Herb-AI/HerbEvaluation.jl.git
+[submodule "lib/HerbExamples.jl"]
+	path = lib/HerbExamples.jl
+	url = https://github.com/Herb-AI/HerbExamples.jl.git
+[submodule "lib/HerbGrammar.jl"]
+	path = lib/HerbGrammar.jl
+	url = https://github.com/Herb-AI/HerbGrammar.jl.git
