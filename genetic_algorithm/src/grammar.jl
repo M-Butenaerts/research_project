@@ -4,8 +4,7 @@ using ScikitLearn.Pipelines: Pipeline, FeatureUnion
 using XGBoost
 using Revise
 
-include("lib/Herb.jl/src/Herb.jl")
-include("genetic_algorithm/src/genetic_algorithm.jl")
+# include("../../lib/Herb.jl/src/Herb.jl")
 
 @sk_import decomposition: (PCA)
 @sk_import preprocessing: (StandardScaler, RobustScaler, MinMaxScaler, MaxAbsScaler, Binarizer, PolynomialFeatures)
@@ -50,28 +49,3 @@ grammar = Herb.HerbGrammar.@cfgrammar begin
         ("LogisticRegression", LogisticRegression()) |
         ("NearestNeighborClassifier", NearestNeighbors())
 end
-
-
-cfe = Herb.HerbSearch.ContextFreeEnumerator(grammar, 5, :START)
-# println(length(Herb.HerbGrammar.nonterminals(grammar)))
-# println(length(grammar.types))
-rule = collect(cfe)[1000]
-# e = Herb.HerbGrammar.rulenode2expr(rule.children[2], grammar)
-println(rule)
-mutation(rule, grammar)
-
-
-# children = get_children(rule)
-# println(Herb.HerbGrammar.rulenode2expr(rule, grammar))
-# println(length(children))
-# println(children)
-# for child in children
-#     println(Herb.HerbGrammar.rulenode2expr(child, grammar))
-# end
-# for i in 1:length(grammar.types)
-#     if(e == grammar.rules[i])
-#         println()
-#         println(grammar.types[i])
-#         println(grammar.rules[i])
-#     end
-# end
