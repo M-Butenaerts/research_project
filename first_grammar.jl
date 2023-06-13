@@ -55,10 +55,16 @@ end
 cfe = Herb.HerbSearch.ContextFreeEnumerator(grammar, 5, :START)
 # println(length(Herb.HerbGrammar.nonterminals(grammar)))
 # println(length(grammar.types))
-rule = collect(cfe)[1000]
+rule1 = collect(cfe)[1000]
+rule2 = collect(cfe)[2000]
 # e = Herb.HerbGrammar.rulenode2expr(rule.children[2], grammar)
-println(rule)
-mutation(rule, grammar)
+println(Herb.HerbGrammar.rulenode2expr(rule1, grammar))
+println(Herb.HerbGrammar.rulenode2expr(rule2, grammar))
+println()
+cross_over(rule1, rule2)
+println()
+println(Herb.HerbGrammar.rulenode2expr(rule1, grammar))
+println(Herb.HerbGrammar.rulenode2expr(rule2, grammar))
 
 
 # children = get_children(rule)

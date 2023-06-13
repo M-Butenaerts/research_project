@@ -19,19 +19,20 @@ rule = collect(cfe)[1000]
 #   ("NearestNeighborClassifier", NearestNeighbors())                   
 #])
 # println(parser(Herb.HerbSearch.rulenode2expr(rule, grammar)))
+for i in 1:10
+    it = Herb.HerbSearch.GeneticSearchIterator(
+        grammar, 
+        Vector{Herb.HerbData.IOExample}([]), 
+        fitness_function_function(61),
+        cross_over,
+        mutation, 
+        stopping_condition, 
+        :START, 
+        5, 
+        10, 
+        0.1, 
+        0.1
+    )
 
-it = Herb.HerbSearch.GeneticSearchIterator(
-    grammar, 
-    Vector{Herb.HerbData.IOExample}([]), 
-    fitness_function_function(61),
-    cross_over,
-    mutation, 
-    stopping_condition, 
-    :START, 
-    5, 
-    10, 
-    0.1, 
-    0.1
-)
-
-Base.iterate(it)
+    Base.iterate(it)
+end

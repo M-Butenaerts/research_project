@@ -47,10 +47,8 @@ function fitness_function_function(dataset_nr)
             
     function fitness_function(chromosome) 
         pipeline = parser(Herb.HerbSearch.rulenode2expr(chromosome, grammar), 0)[2]
-        fitness = -1
+        fitness = 0
         println("       PARSER DONE")
-        println(size(TRAIN_FEATURES))
-        println(size(TRAIN_LABELS))
         try
             ScikitLearn.fit!(pipeline, TRAIN_FEATURES, String.(TRAIN_LABELS))
             println("       FIT DONE")
@@ -58,14 +56,11 @@ function fitness_function_function(dataset_nr)
             println("       PREDICT DONE")
         
         fitness = mean(predictions .== TEST_LABELS)
-        catch ex
-            if isa(ex, PyError) && isa(ex.args[1], ValueError) && occursin("Found array with 0 feature(s)", ex.args[1].msg)
-                println("Caught ValueError: ", ex.args[1].msg)
-            else
-                println("Caught exception: ", ex)
-            end
+        catch 
+            println("   INVALID PIPELINE")
+            fitness = 0
         end    
-        
+              
         println("       FITNESS: $(fitness)")
         return fitness
     end
@@ -120,11 +115,6 @@ function get_random_other_rule(gen, type, grammar)
     for i in 1:length(grammar.types)
         if(grammar.types[i] == type && Herb.HerbGrammar.rulenode2expr(gen, grammar) != grammar.rules[i])
             new_gen = Herb.HerbGrammar.RuleNode(i)
-            # for i in 1:length(grammar.types)
-            #     if(grammar.types[i] == type && Herb.HerbGrammar.rulenode2expr(gen, grammar) == grammar.rules[i])
-                    
-            #     end
-            # end
             push!(others, new_gen)
         end
     end
@@ -152,11 +142,61 @@ end
 
 
 function stopping_condition(iteration, fitness)
-    return (iteration > 10) || (fitness > 1.0)
+    return (iteration > 10) || (fitness == 1.0)
 end
 
 function cross_over(chromosome1, chromosome2)
-    return (chromosome1, chromosome2)
+    
+    # find crossing point 
+    rules1 = get_cross_point(chromosome1)
+    rules2 = get_cross_point(chromosome2)
+    
+    rule1 = rules1[rand(1:length(rules1)-1)]
+    rule2 = rules2[rand(1:length(rules2)-1)]
+    
+    while length(get_cross_point(rule1)) != length(get_cross_point(rule2))
+        rules1 = get_cross_point(chromosome1)
+        rules2 = get_cross_point(chromosome2)
+    
+        rule1 = rules1[rand(1:length(rules1)-1)]
+        rule2 = rules2[rand(1:length(rules2)-1)]
+    end
+
+    # println("rule1: $rule1")
+    # println("rule2: $rule2")
+    # println("")
+    
+    # cross over 
+    exchange_rules(chromosome1, rule2, rule1)
+    exchange_rules(chromosome2, rule1, rule2)    
+
+    return (chromosome1, chromosome2) 
+end
+
+function get_cross_point(chromosome)
+    rules = []
+    for child in chromosome.children
+        push!(rules, child)
+        for grand_child in get_cross_point(child)
+            push!(rules, grand_child)
+        end 
+    end
+    return rules
+end
+
+function exchange_rules(chromosome, rule1, rule2)
+    # println("chromosome: $chromosome")
+    # println("rule1: $rule1")
+    # println("rule2: $rule2")
+    for i in (1:length(chromosome.children))
+        
+        if (chromosome.children[i] == rule2)
+            chromosome.children[i] = rule1
+            return
+        end
+        exchange_rules(chromosome.children[i], rule1, rule2) 
+    end
+    return
 end
 
 function parser(e::Expr, count)
