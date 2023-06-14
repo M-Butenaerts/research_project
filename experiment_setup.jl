@@ -360,7 +360,7 @@ foreach(rm, readdir("db_output",join=true))
 
 search_alg_name = "vlns"             # options: bfs, vlns, mh
 
-dataset_ids = [1499, 37, 1504]            # datasets: [seeds:1499, diabetes:37, tic-tac-toe:50, steel-plates-fault:1504]
+dataset_ids = [1499, 37, 1510, 1504]            # datasets: [seeds:1499, diabetes:37, wdbc:1510, steel-plates-fault:1504]
 
 n_runs = 2
 
