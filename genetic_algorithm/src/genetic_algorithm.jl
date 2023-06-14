@@ -49,14 +49,16 @@ function fitness_function_function(dataset_nr)
         pipeline = parser(Herb.HerbSearch.rulenode2expr(chromosome, grammar), 0)[2]
         fitness = 0
         println("       PARSER DONE")
-        try
+        
+        try    
             ScikitLearn.fit!(pipeline, TRAIN_FEATURES, String.(TRAIN_LABELS))
             println("       FIT DONE")
             predictions = ScikitLearn.predict(pipeline, TEST_FEATURES)
             println("       PREDICT DONE")
         
-        fitness = mean(predictions .== TEST_LABELS)
-        catch 
+            fitness = mean(predictions .== TEST_LABELS)
+        catch ex
+            println(ex) 
             println("   INVALID PIPELINE")
             fitness = 0
         end    
@@ -67,6 +69,22 @@ function fitness_function_function(dataset_nr)
     return fitness_function
 end
 
+function insert_name_indexes(p)
+    p_start = ""
+    i = 1
+    while i <= 100
+        try
+            p = replace(p, """,""" => string(i)*""",""", count=1)
+            p_split = split(p, string(i)*""", """)
+            p_start *= p_split[1] * string(i) * """, """
+            p = p_split[2]
+            i += 1
+        catch 
+            break
+        end
+    end
+    return split(p_start, string(i))[0]
+end
 function mutation(chromosome, grammar)
     # find all children 
     
@@ -142,21 +160,23 @@ end
 
 
 function stopping_condition(iteration, fitness)
-    return (iteration > 10) || (fitness == 1.0)
+    return iteration > 10 || fitness >= 9.9
 end
 
-function cross_over(chromosome1, chromosome2)
+function cross_over(chromosome1, chromosome2, fitness_function)
     
+    copy1 = Base.deepcopy(chromosome1)
+    copy2 = Base.deepcopy(chromosome2)
     # find crossing point 
-    rules1 = get_cross_point(chromosome1)
-    rules2 = get_cross_point(chromosome2)
+    rules1 = get_cross_point(copy1)
+    rules2 = get_cross_point(copy2)
     
     rule1 = rules1[rand(1:length(rules1)-1)]
     rule2 = rules2[rand(1:length(rules2)-1)]
     
     while length(get_cross_point(rule1)) != length(get_cross_point(rule2))
-        rules1 = get_cross_point(chromosome1)
-        rules2 = get_cross_point(chromosome2)
+        rules1 = get_cross_point(copy1)
+        rules2 = get_cross_point(copy2)
     
         rule1 = rules1[rand(1:length(rules1)-1)]
         rule2 = rules2[rand(1:length(rules2)-1)]
@@ -167,10 +187,12 @@ function cross_over(chromosome1, chromosome2)
     # println("")
     
     # cross over 
-    exchange_rules(chromosome1, rule2, rule1)
-    exchange_rules(chromosome2, rule1, rule2)    
-
-    return (chromosome1, chromosome2) 
+    exchange_rules(copy1, rule2, rule1)
+    exchange_rules(copy2, rule1, rule2)    
+    if fitness_function(copy1) == 0 || fitness_function(copy2) == 0
+        return (chromosome1, chromosome2)  
+    end
+    return (copy1, copy2) 
 end
 
 function get_cross_point(chromosome)
