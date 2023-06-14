@@ -24,12 +24,12 @@ using Suppressor
 using Random
 using Dates
 
-include("./Herb.jl/src/Herb.jl")
-include("./Herb.jl/HerbGrammar.jl/src/HerbGrammar.jl")
-include("./Herb.jl/HerbData.jl/src/HerbData.jl")
-include("./Herb.jl/HerbEvaluation.jl/src/HerbEvaluation.jl")
-include("./Herb.jl/HerbConstraints.jl/src/HerbConstraints.jl")
-include("./Herb.jl/HerbSearch.jl/src/HerbSearch.jl")
+include("lib/Herb.jl/src/Herb.jl")
+include("lib/Herb.jl/HerbGrammar.jl/src/HerbGrammar.jl")
+include("lib/Herb.jl/HerbData.jl/src/HerbData.jl")
+include("lib/Herb.jl/HerbEvaluation.jl/src/HerbEvaluation.jl")
+include("lib/Herb.jl/HerbConstraints.jl/src/HerbConstraints.jl")
+include("lib/Herb.jl/HerbSearch.jl/src/HerbSearch.jl")
 include("helper.jl")
 
 # import the search algorithms
@@ -47,6 +47,7 @@ include("./search_algorithms/vlns.jl")
 @sk_import neighbors: (NearestNeighbors, KNeighborsClassifier)
 @sk_import svm: (LinearSVC)
 
+Random.seed!(1234)
 
 global pipelines_evaluated = 0
 
@@ -54,24 +55,27 @@ global pipelines_evaluated = 0
 Splits the dataset in the train set and test set. 
 Also splits the features and labels.
 """
-function load_and_split_dataset(dataset_id, train_test_ratio)
-
+function load_and_split_dataset(dataset)
+    
     # load and shuffle dataset
-    dataset = get_dataset(dataset_id)
     dataset_shuffled = dataset[shuffle(1:end), :]
     
     # split into train and test sets 
-    split_index = floor(Int, size(dataset_shuffled, 1) * train_test_ratio)
-    train_df = dataset_shuffled[1:split_index, :]
-    test_df = dataset_shuffled[split_index+1:end, :]
+    train_ind = floor(Int, size(dataset_shuffled, 1) * 0.75)
+    val_ind = train_ind + floor(Int, size(dataset_shuffled, 1) * 0.15)
+    train_df = dataset_shuffled[1:train_ind, :]
+    val_df = dataset_shuffled[(train_ind+1):val_ind, :]
+    test_df = dataset_shuffled[(val_ind+1):end, :]
 
     # split into features and labels
     train_X = train_df[:, 1:end-1]
     train_Y = train_df[:, end]
     test_X = test_df[:, 1:end-1]
     test_Y = test_df[:, end]
+    val_X = val_df[:, 1:end-1]
+    val_Y = val_df[:, end]
 
-    return train_X, train_Y, test_X, test_Y
+    return train_X, train_Y, val_X, val_Y, test_X, test_Y
 end
 
 
@@ -227,7 +231,7 @@ function parameters_info_string(search_alg_name, dataset_ids, n_runs, train_test
 end
 
 """returns a string with information about te run"""
-function run_info_string(dataset_id, grammar, search_alg_name, start_time, end_time, best_pipeline, best_cost)
+function run_info_string(dataset_id, grammar, search_alg_name, start_time, end_time, best_pipeline, best_cost, test_accuracy)
     duration = (end_time-start_time).value
 
     result  = 
@@ -237,7 +241,8 @@ function run_info_string(dataset_id, grammar, search_alg_name, start_time, end_t
         " (= " * string(round(duration/1000, digits=2)) * " seconds)" * "\n" * 
         "Best pipeline: " * string(best_pipeline) * "\n" * 
         "             : " * string(Herb.HerbSearch.rulenode2expr(best_pipeline, grammar)) * "\n" *
-        "Cost: " * string(best_cost)* "\n\n" 
+        "Cost: " * string(best_cost)* "\n" 
+        "Test accuracy: " * string(test_accuracy) * "\n\n"
         
     return result
 end
@@ -285,15 +290,19 @@ function run_search(
             dataset_id => Dict(
                 "cost" => [],
                 "avg_cost" => 1.11,
-                "sample_variance" => 1.11
+                "sample_variance_cost" => 1.11,
+                "test_accuracy" => [],
+                "avg_test_accuracy" => 1.11,
+                "sample_variance_test_accuracy" => 1.11
         )))
-
+        ##load dataset HERE
+        dataset = get_dataset(dataset_id)
         # run the search algorithm n_runs times
         for i in range(1, n_runs)
             # get train-test splits
-            train_X, train_Y, test_X, test_Y = load_and_split_dataset(dataset_id, train_test_split)
-            data = [train_X, train_Y, test_X, test_Y]
-            global pipelines_evaluated = 0
+            # Shuffle and split the dataset
+            train_X, train_Y, val_X, val_Y, test_X, test_Y = load_and_split_dataset(dataset)
+            data = [train_X, train_Y, val_X, val_Y]
 
             println(string(dataset_id) * " - " * string(i))
             best_program = nothing
@@ -308,18 +317,26 @@ function run_search(
                 best_program, best_program_cost = simple_enumerative_search(grammar, data, enumeration_depth, max_seconds)
             end
             end_time = now()
-
+            
+            pipeline = eval(Meta.parse(insert_name_indexes(string(Herb.HerbSearch.rulenode2expr(best_program, grammar)))))
+            test_accuracy = evaluate_pipeline(pipeline, train_X, train_Y, test_X, test_Y)
             # add to result string
-            result_string *= run_info_string(dataset_id, grammar, search_alg_name, start_time, end_time, best_program, best_program_cost)
+            result_string *= run_info_string(dataset_id, grammar, search_alg_name, start_time, end_time, best_program, best_program_cost, test_accuracy)
 
             # add to result dictionary
             push!(results[dataset_id]["cost"], best_program_cost)
+            push!(results[dataset_id]["test_accuracy"], test_accuracy)
         end
 
         costs = results[dataset_id]["cost"]
         avg_cost = sum(costs)/n_runs
         results[dataset_id]["avg_cost"] = avg_cost
-        results[dataset_id]["sample_variance"] = sum((costs.-avg_cost).^2)/(n_runs-1)
+        results[dataset_id]["sample_variance_cost"] = sum((costs.-avg_cost).^2)/(n_runs-1)
+        
+        test_accuracies = results[dataset_id]["test_accuracy"]
+        avg_test_accuracy = sum(test_accuracies)/n_runs
+        results[dataset_id]["avg_test_accuracy"] = avg_test_accuracy
+        results[dataset_id]["sample_variance_test_accuracy"] = sum((test_accuracies.-avg_test_accuracy).^2)/(n_runs-1)
     end
 
     result_string = pretty_print_dict(results) * "\n\n\n" * result_string
@@ -371,7 +388,7 @@ max_initial_pipeline_depth = max_pipeline_depth
 # save the avg costs in a new dict
 final_results = Dict()
 for id in dataset_ids
-    final_results[id] = Dict("avg_costs" => [], "avg_variance" => [])
+    final_results[id] = Dict("avg_costs" => [], "avg_variance_cost" => [], "avg_test_accuracy" => [], "avg_variance_test_accuracy" => [])
 end
 
 
@@ -386,7 +403,9 @@ for value in values
     # calculate the avg costs for each value
     for (id, val) in res
             push!(final_results[id]["avg_costs"], val["avg_cost"])
-            push!(final_results[id]["avg_variance"], val["sample_variance"])
+            push!(final_results[id]["avg_variance_cost"], val["sample_variance_cost"])
+            push!(final_results[id]["avg_test_accuracy"], val["avg_test_accuracy"])
+            push!(final_results[id]["avg_variance_test_accuracy"], val["sample_variance_test_accuracy"])
     end
 end
 
