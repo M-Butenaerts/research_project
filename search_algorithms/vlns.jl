@@ -30,6 +30,12 @@ function find_best_neighbour_in_neighbourhood(current_program, grammar, data, en
         if neighbours_tried == neighbours_per_iteration
             break
         end
+        if pipelines_evaluated == max_pipelines
+            if print_statements
+                println("max pipelines reached [find_best_neighbour_in_neighbourhood]")
+            end
+            break
+        end
         # change current_program to one of its neighbours 
         if neighbourhood_node_loc.i == 0
             possible_program = replacement_expression
@@ -59,7 +65,10 @@ function vlns(grammar, data, enumeration_depth, max_seconds, max_iterations_with
     t_start = now()
     while true
         t_now = now()
-        if t_now - t_start > max_time
+        if pipelines_evaluated == max_pipelines
+            if print_statements
+                println("max pipelines reached [vlns]")
+            end
             break
         end
         if print_statements
