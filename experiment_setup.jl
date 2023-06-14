@@ -32,6 +32,10 @@ include("./Herb.jl/HerbConstraints.jl/src/HerbConstraints.jl")
 include("./Herb.jl/HerbSearch.jl/src/HerbSearch.jl")
 include("helper.jl")
 
+#declaration of global variables, max_pipeline is set at the bottom of the file
+global pipelines_evaluated = 0
+global max_pipelines = 0
+
 # import the search algorithms
 include("./search_algorithms/simple_enumerative_search.jl")
 include("./search_algorithms/metropolis_hastings.jl")
@@ -47,31 +51,34 @@ include("./search_algorithms/vlns.jl")
 @sk_import neighbors: (NearestNeighbors, KNeighborsClassifier)
 @sk_import svm: (LinearSVC)
 
+Random.seed!(1234)
 
-global pipelines_evaluated = 0
 
 """
-Splits the dataset in the train set and test set. 
+Splits the dataset in the train set, validation set and test set. 
 Also splits the features and labels.
 """
-function load_and_split_dataset(dataset_id, train_test_ratio)
-
+function split_dataset(dataset)
+    
     # load and shuffle dataset
-    dataset = get_dataset(dataset_id)
     dataset_shuffled = dataset[shuffle(1:end), :]
     
     # split into train and test sets 
-    split_index = floor(Int, size(dataset_shuffled, 1) * train_test_ratio)
-    train_df = dataset_shuffled[1:split_index, :]
-    test_df = dataset_shuffled[split_index+1:end, :]
+    train_ind = floor(Int, size(dataset_shuffled, 1) * 0.70)
+    val_ind = train_ind + floor(Int, size(dataset_shuffled, 1) * 0.15)
+    train_df = dataset_shuffled[1:train_ind, :]
+    val_df = dataset_shuffled[(train_ind+1):val_ind, :]
+    test_df = dataset_shuffled[(val_ind+1):end, :]
 
     # split into features and labels
     train_X = train_df[:, 1:end-1]
     train_Y = train_df[:, end]
     test_X = test_df[:, 1:end-1]
     test_Y = test_df[:, end]
+    val_X = val_df[:, 1:end-1]
+    val_Y = val_df[:, end]
 
-    return train_X, train_Y, test_X, test_Y
+    return train_X, train_Y, val_X, val_Y, test_X, test_Y
 end
 
 
@@ -207,7 +214,7 @@ function pipeline_cost_function(pipeline, train_X, train_Y, test_X, test_Y)
 end
 
 """returns a string with information about the parameters"""
-function parameters_info_string(search_alg_name, dataset_ids, n_runs, train_test_split, grammar, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration)
+function parameters_info_string(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration)
     result  = 
         "Search algorithm: " * uppercase(search_alg_name) * "\n" *
         "Datasets: " * string(dataset_ids) * "\n" *
@@ -227,7 +234,7 @@ function parameters_info_string(search_alg_name, dataset_ids, n_runs, train_test
 end
 
 """returns a string with information about te run"""
-function run_info_string(dataset_id, grammar, search_alg_name, start_time, end_time, best_pipeline, best_cost)
+function run_info_string(dataset_id, grammar, search_alg_name, start_time, end_time, best_pipeline, best_cost, accuracy)
     duration = (end_time-start_time).value
 
     result  = 
@@ -237,7 +244,8 @@ function run_info_string(dataset_id, grammar, search_alg_name, start_time, end_t
         " (= " * string(round(duration/1000, digits=2)) * " seconds)" * "\n" * 
         "Best pipeline: " * string(best_pipeline) * "\n" * 
         "             : " * string(Herb.HerbSearch.rulenode2expr(best_pipeline, grammar)) * "\n" *
-        "Cost: " * string(best_cost)* "\n\n" 
+        "Cost: " * string(best_cost)* "\n"  *
+        "Test Accuracy: " * string(accuracy) * "\n\n"
         
     return result
 end
@@ -265,7 +273,6 @@ function run_search(
         search_alg_name, 
         dataset_ids,
         n_runs,
-        train_test_split,
         grammar, 
         enumeration_depth, 
         max_seconds, 
@@ -276,23 +283,25 @@ function run_search(
 
 
     # information about the runs
-    result_string = parameters_info_string(search_alg_name, dataset_ids, n_runs, train_test_split, grammar, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration)
+    result_string = parameters_info_string(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration)
     results = Dict{Int, Any}()
 
     for dataset_id in dataset_ids
         # add new field to the results dict
         merge!(results, Dict(
             dataset_id => Dict(
-                "cost" => [],
-                "avg_cost" => 1.11,
-                "sample_variance" => 1.11
+                "accuracy" => [],
+                "avg_accuracy" => 1.11,
+                "sample_variance_accuracy" => 1.11
         )))
-
+        ##load dataset HERE
+        dataset = get_dataset(dataset_id)
         # run the search algorithm n_runs times
         for i in range(1, n_runs)
             # get train-test splits
-            train_X, train_Y, test_X, test_Y = load_and_split_dataset(dataset_id, train_test_split)
-            data = [train_X, train_Y, test_X, test_Y]
+            # Shuffle and split the dataset
+            train_X, train_Y, val_X, val_Y, test_X, test_Y = split_dataset(dataset)
+            data = [train_X, train_Y, val_X, val_Y]
             global pipelines_evaluated = 0
 
             println(string(dataset_id) * " - " * string(i))
@@ -309,17 +318,21 @@ function run_search(
             end
             end_time = now()
 
+            pipeline = eval(Meta.parse(insert_name_indexes(string(Herb.HerbSearch.rulenode2expr(best_program, grammar)))))
+            global pipelines_evaluated = 0
+            accuracy = evaluate_pipeline(pipeline, train_X, train_Y, test_X, test_Y)
             # add to result string
-            result_string *= run_info_string(dataset_id, grammar, search_alg_name, start_time, end_time, best_program, best_program_cost)
+            result_string *= run_info_string(dataset_id, grammar, search_alg_name, start_time, end_time, best_program, best_program_cost, accuracy)
 
             # add to result dictionary
-            push!(results[dataset_id]["cost"], best_program_cost)
+            push!(results[dataset_id]["accuracy"], accuracy)
         end
 
-        costs = results[dataset_id]["cost"]
-        avg_cost = sum(costs)/n_runs
-        results[dataset_id]["avg_cost"] = avg_cost
-        results[dataset_id]["sample_variance"] = sum((costs.-avg_cost).^2)/(n_runs-1)
+        
+        test_accuracies = results[dataset_id]["accuracy"]
+        avg_accuracy = sum(test_accuracies)/n_runs
+        results[dataset_id]["avg_accuracy"] = avg_accuracy
+        results[dataset_id]["sample_variance_accuracy"] = sum((test_accuracies.-avg_accuracy).^2)/(n_runs-1)
     end
 
     result_string = pretty_print_dict(results) * "\n\n\n" * result_string
@@ -329,7 +342,7 @@ end
 """runs the search algorithm and saves the results to a file"""
 function run_and_save(filename)
     #run algorithm - don't touch this!! (change at the top instead)
-    result_string, results = run_search(search_alg_name, dataset_ids, n_runs, train_test_split, grammar, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration)
+    result_string, results = run_search(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration)
     println(result_string)
     
     #write result to file
@@ -345,13 +358,13 @@ foreach(rm, readdir("db_output",join=true))
 
 ### set the right parameters here
 
-search_alg_name = "bfs"             # options: bfs, vlns, mh
+search_alg_name = "vlns"             # options: bfs, vlns, mh
 
-dataset_ids = [61,1499]            # datasets: [seeds:1499, diabetes:37, tic-tac-toe:50, steel-plates-fault:1504]
+dataset_ids = [1499, 37, 1504]            # datasets: [seeds:1499, diabetes:37, tic-tac-toe:50, steel-plates-fault:1504]
 
 n_runs = 2
 
-max_pipelines = 10
+max_pipelines = 100
 
 # other parameters
 
@@ -359,19 +372,18 @@ max_pipelines = 10
 enumeration_depth = 3
 max_pipeline_depth = 5
 neighbours_per_iteration = 15
-max_iterations_without_improvement = 50
+max_iterations_without_improvement = 10
 
 
 # don't optimize
-train_test_split = 0.9
-max_seconds = 3
+max_seconds = 300
 max_initial_pipeline_depth = max_pipeline_depth
 
 
 # save the avg costs in a new dict
 final_results = Dict()
 for id in dataset_ids
-    final_results[id] = Dict("avg_costs" => [], "avg_variance" => [])
+    final_results[id] = Dict("avg_accuracy" => [], "avg_sample_variance_accuracy" => [])
 end
 
 
@@ -385,12 +397,12 @@ for value in values
 
     # calculate the avg costs for each value
     for (id, val) in res
-            push!(final_results[id]["avg_costs"], val["avg_cost"])
-            push!(final_results[id]["avg_variance"], val["sample_variance"])
+            push!(final_results[id]["avg_accuracy"], val["avg_accuracy"])
+            push!(final_results[id]["avg_sample_variance_accuracy"], val["sample_variance_accuracy"])
     end
 end
 
 # write avg costs to file 
-open("db_output/avg_costs.txt", "w") do file
+open("db_output/avg_accuracies.txt", "w") do file
     write(file, pretty_print_dict(final_results))
 end
