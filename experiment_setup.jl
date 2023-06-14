@@ -32,6 +32,11 @@ include("./Herb.jl/HerbConstraints.jl/src/HerbConstraints.jl")
 include("./Herb.jl/HerbSearch.jl/src/HerbSearch.jl")
 include("helper.jl")
 
+# import the search algorithms
+include("./search_algorithms/simple_enumerative_search.jl")
+include("./search_algorithms/metropolis_hastings.jl")
+include("./search_algorithms/vlns.jl")
+
 # import the sk-learn functions
 @sk_import decomposition: (PCA)
 @sk_import preprocessing: (StandardScaler, RobustScaler, MinMaxScaler, MaxAbsScaler, Binarizer, PolynomialFeatures)
@@ -41,6 +46,9 @@ include("helper.jl")
 @sk_import linear_model: (LogisticRegression)
 @sk_import neighbors: (NearestNeighbors, KNeighborsClassifier)
 @sk_import svm: (LinearSVC)
+
+
+global pipelines_evaluated = 0
 
 """
 Splits the dataset in the train set and test set. 
@@ -158,54 +166,6 @@ function rand_choose(a::Array)
     return a[idx]
 end
 
-"""constructs neighborhood given the pipeline and returns the best neighbor in its neighborhood"""
-function find_best_neighbour_in_neighbourhood(current_program, grammar, data, enumeration_depth, t_start, max_time, max_pipeline_depth, neighbours_per_iteration, print_statements=false)
-    # 1. Construct neighbourhood
-    neighbourhood_node_loc, dict = Herb.HerbSearch.constructNeighbourhoodRuleSubset(current_program, grammar)
-    replacement_expressions = Herb.HerbSearch.enumerate_neighbours_propose(enumeration_depth)(current_program, 
-                                                                                                neighbourhood_node_loc, 
-                                                                                                grammar,
-                                                                                                max_pipeline_depth, # = max depth of pipeline, depth of subprogram is bound by this
-                                                                                                dict)
-
-    # 2. Find best neighbour
-    best_program = deepcopy(current_program)
-    pipeline = eval(Meta.parse(insert_name_indexes(string(Herb.HerbSearch.rulenode2expr(best_program, grammar)))))
-    best_program_cost = pipeline_cost_function(pipeline, data[1], data[2], data[3], data[4])
-    possible_program = current_program
-    neighbours_tried = 0
-    for replacement_expression in replacement_expressions
-        t_now = now()
-        if t_now - t_start > max_time
-            if print_statements
-                println("Timelimit reached")
-            end
-            break
-        end
-        if (neighbours_tried % 5) == 0
-            if print_statements
-                println("Tried ", neighbours_tried, " neighbours")
-            end
-        end
-        if neighbours_tried == neighbours_per_iteration
-            break
-        end
-        # change current_program to one of its neighbours 
-        if neighbourhood_node_loc.i == 0
-            possible_program = replacement_expression
-        else
-            neighbourhood_node_loc.parent.children[neighbourhood_node_loc.i] = replacement_expression
-        end
-        pipeline = eval(Meta.parse(insert_name_indexes(string(Herb.HerbSearch.rulenode2expr(possible_program, grammar)))))
-        possible_program_cost = pipeline_cost_function(pipeline, data[1], data[2], data[3], data[4])
-        if possible_program_cost <= best_program_cost
-            best_program = deepcopy(current_program)
-            best_program_cost = possible_program_cost        
-        end
-        neighbours_tried += 1
-    end
-    return best_program, best_program_cost
-end
 
 
 """
@@ -214,14 +174,18 @@ input:  pipeline, train_X, train_Y, test_X, test_Y
 output: accuracy of pipeline
 """
 function evaluate_pipeline(pipeline, train_X, train_Y, test_X, test_Y)
+    global pipelines_evaluated += 1
+    println(pipelines_evaluated)
+
+    if pipelines_evaluated > max_pipelines
+        return 0.0
+    end
 
     # # this gives the following warning often, so it is suppressed for now.
     # # ConvergenceWarning: lbfgs failed to converge
     @suppress_err begin
         try
             # fit the pipeline
-            # print(pipeline)
-            # print(" - ")
             model = ScikitLearn.fit!(pipeline, Matrix(train_X), Array(train_Y))
 
             # make predictions
@@ -240,165 +204,6 @@ end
 """Trains the pipeline and returns 1-accuracy"""
 function pipeline_cost_function(pipeline, train_X, train_Y, test_X, test_Y)
     return 1.0 - evaluate_pipeline(pipeline, train_X, train_Y, test_X, test_Y)
-end
-
-"""Simple Enumerative Search (BFS)"""
-function simple_enumerative_search(grammar, data, enumeration_depth, max_seconds)
-
-    # initialize values
-    best_program = nothing
-    best_cost = 1.1
-    max_time = Dates.Millisecond(max_seconds * 1000)
-    t_start = now()
-        
-    # enumerate pipelines in bfs manner
-    enumerator = Herb.HerbSearch.ContextFreeEnumerator(grammar, enumeration_depth, :START)
-    for rule in enumerator
-        # check time
-        t_now = now()
-        if t_now - t_start > max_time
-            break
-        end
-
-        # evaluate the pipeline
-        pipeline = eval(Meta.parse(insert_name_indexes(string(Herb.HerbSearch.rulenode2expr(rule, grammar)))))
-        cost = pipeline_cost_function(pipeline, data[1], data[2], data[3], data[4])
-
-        # update best cost
-        if cost < best_cost
-            best_cost = cost
-            best_program = rule
-        end
-    end
-    
-    return best_program, best_cost
-end
-
-"""Very Large Neighborhood Search"""
-function vlns(grammar, data, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration=15, print_statements=false)
-    current_program = get_random_pipeline(grammar, max_initial_pipeline_depth, :START)
-    println("start pipeline: ", current_program)
-    current_cost = 1.1
-    i = 0
-    not_improved_counter = 0
-    max_time = Dates.Millisecond(max_seconds * 1000)
-    t_start = now()
-    while true
-        t_now = now()
-        if t_now - t_start > max_time
-            break
-        end
-        if print_statements
-            println("Iteration: ", i)
-        end
-        previous_cost = current_cost
-        current_program, current_cost = find_best_neighbour_in_neighbourhood(current_program, grammar, data, enumeration_depth, t_start, max_time, max_pipeline_depth, neighbours_per_iteration, print_statements)
-
-        if current_cost == previous_cost
-            not_improved_counter += 1
-            if not_improved_counter == max_iterations_without_improvement
-                if print_statements
-                    println("Stopping because hasn't inproved in ", max_iterations_without_improvement, " iterations")
-                end
-                break
-            end
-        else
-            not_improved_counter = 0
-        end
-
-        if current_cost == 0.0
-            if print_statements
-                println("Stopping because cost is 0.0")
-            end
-            break
-        end
-        i += 1
-    end
-    if print_statements
-        println("Final program: ", current_program)
-        println("Final cost: ", current_cost)
-    end
-    return current_program, current_cost
-end
-
-"""Metropolis-Hastings search"""
-function mh(grammar, data, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth)
-    current_program = get_random_pipeline(grammar, max_initial_pipeline_depth, :START)
-    current_accuracy = 0.0
-    best_program = current_program
-    best_accuracy = current_accuracy
-    i = 0
-    not_improved_counter = 0
-    max_time = Dates.Millisecond(max_seconds * 1000)
-    t_start = now()
-    while true
-        t_now = now()
-        if t_now - t_start > max_time
-            break
-        end
-        if (i % 10 == 0)
-            println("iteration: ", i)
-        end
-        
-        previous_accuracy = current_accuracy
-        current_program, current_accuracy = one_iter_mh(current_program, grammar, data, enumeration_depth, t_start, max_time, max_pipeline_depth, current_accuracy)
-
-        if current_accuracy == previous_accuracy
-            not_improved_counter += 1
-            if not_improved_counter == max_iterations_without_improvement
-                println("stopping because hasn't inproved in" * string(max_iterations_without_improvement) * "iterations")
-                break
-            end
-        else
-            not_improved_counter = 0
-        end
-        if current_accuracy > best_accuracy
-            best_accuracy = current_accuracy
-            best_program = current_program
-        end
-        if current_accuracy == 1.0
-            println("stopping because accuracy is 1.0")
-            break
-        end
-        i += 1
-    end
-
-    best_cost = 1.0 - best_accuracy
-
-    println("final program: ", best_program)
-    println("final cost: ", best_cost)
-    return best_program, best_cost
-end
-
-"""Helper function for M-H search"""
-function one_iter_mh(current_program, grammar, data, enumeration_depth, t_start, max_time, max_pipeline_depth, current_program_accuracy)
-    # 1. Construct neighbourhood
-    neighbourhood_node_loc, dict = Herb.HerbSearch.constructNeighbourhoodRuleSubset(current_program, grammar)
-    replacement_expressions = Herb.HerbSearch.enumerate_neighbours_propose(enumeration_depth)(current_program, 
-                                                                                                neighbourhood_node_loc, 
-                                                                                                grammar,
-                                                                                                max_pipeline_depth, # = max depth of pipeline, depth of subprogram is bound by this
-                                                                                                dict)
-
-    replacement_expression = rand_choose(replacement_expressions)
-
-    original_program = deepcopy(current_program)  
-    alternative_program = current_program                                                                                          
-    if neighbourhood_node_loc.i == 0
-        alternative_program = replacement_expression
-    else
-        neighbourhood_node_loc.parent.children[neighbourhood_node_loc.i] = replacement_expression
-    end
-
-    pipeline = eval(Meta.parse(insert_name_indexes(string(Herb.HerbSearch.rulenode2expr(alternative_program, grammar)))))
-    alternative_program_cost = pipeline_cost_function(pipeline, data[1], data[2], data[3], data[4])
-    alternative_program_accuracy = 1.0 - alternative_program_cost
-
-    if (alternative_program_accuracy / current_program_accuracy) > ((rand(Int)%100000)/100000)
-        return alternative_program, alternative_program_accuracy
-    else
-        return original_program, current_program_accuracy
-    end
 end
 
 """returns a string with information about the parameters"""
@@ -488,6 +293,7 @@ function run_search(
             # get train-test splits
             train_X, train_Y, test_X, test_Y = load_and_split_dataset(dataset_id, train_test_split)
             data = [train_X, train_Y, test_X, test_Y]
+            global pipelines_evaluated = 0
 
             println(string(dataset_id) * " - " * string(i))
             best_program = nothing
@@ -545,6 +351,7 @@ dataset_ids = [61,1499]            # datasets: [seeds:1499, diabetes:37, tic-tac
 
 n_runs = 2
 
+max_pipelines = 10
 
 # other parameters
 
