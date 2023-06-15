@@ -273,7 +273,8 @@ function run_search(
         grammar, 
         enumeration_depth,
         max_pipeline_depth,
-        neighbours_per_iteration)
+        neighbours_per_iteration,
+        train_on_n_samples)
 
 
     # information about the runs
@@ -295,7 +296,7 @@ function run_search(
             # get train-test splits
             # Shuffle and split the dataset
             train_X, train_Y, val_X, val_Y, test_X, test_Y = split_dataset(dataset)
-            data = [train_X, train_Y, val_X, val_Y]
+            data = [first(train_X, train_on_n_samples), first(train_Y, train_on_n_samples), first(val_X, train_on_n_samples), first(val_Y, train_on_n_samples)]
             global pipelines_evaluated = 0
 
             println(string(dataset_id) * " - " * string(i))
@@ -336,7 +337,7 @@ end
 """runs the search algorithm and saves the results to a file"""
 function run_and_save(filename)
     #run algorithm - don't touch this!! (change at the top instead)
-    result_string, results = run_search(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_pipeline_depth, neighbours_per_iteration)
+    result_string, results = run_search(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_pipeline_depth, neighbours_per_iteration, train_on_n_samples)
     println(result_string)
     
     #write result to file
@@ -352,14 +353,16 @@ foreach(rm, readdir("db_output",join=true))
 
 ### set the right parameters here
 
-search_alg_name = "vlns"             # options: bfs, vlns, mh
+search_alg_name = "bfs"             # options: bfs, vlns, mh
 
-dataset_ids = [1499, 37, 1510, 1504]            # datasets: [seeds:1499, diabetes:37, wdbc:1510, steel-plates-fault:1504]
-dataset_ids = [61]            # datasets: [seeds:1499, diabetes:37, wdbc:1510, steel-plates-fault:1504]
+
+dataset_ids = [37, 44]                          # parameter selection: [diabetes:37, spambase:44]
+# dataset_ids = [1499, 1510, 1504, 1478]          # evaluation: [seeds:1499, wdbc:1510, steel-plates-fault:1504, har:1478]
 
 n_runs = 2
 max_pipelines = 10
 
+train_on_n_samples = 1000     # to speed up evaluation, train only on n samples. To train on full dataset, set to 10000000
 
 # parameters to be optimized:
 enumeration_depth = 3
