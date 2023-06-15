@@ -219,6 +219,7 @@ function parameters_info_string(search_alg_name, dataset_ids, n_runs, grammar, e
         "Search algorithm: " * uppercase(search_alg_name) * "\n" *
         "Datasets: " * string(dataset_ids) * "\n" *
         "Number of runs: " * string(n_runs) * "\n" *
+        "train_on_n_samples: " * string(train_on_n_samples) * "\n" *
         "Start time: " * string(Dates.format(now(), "yyyy-mm-dd HH:MM:SS")) * "\n" * 
 
         "Parameters: " * "\n" * 
@@ -362,7 +363,7 @@ dataset_ids = [37, 44]                          # parameter selection: [diabetes
 n_runs = 2
 max_pipelines = 10
 
-train_on_n_samples = 1000     # to speed up evaluation, train only on n samples. To train on full dataset, set to 10000000
+train_on_n_samples = 10     # to speed up evaluation, train only on n samples. To train on full dataset, set to 10000000
 
 # parameters to be optimized:
 enumeration_depth = 3
