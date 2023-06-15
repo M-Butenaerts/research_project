@@ -41,7 +41,7 @@ function select_child(node::TreeNode, c)
 end
 
 # Expands a chosen node by adding all configurations as child nodes an picking one at random.
-function expand_node(node, grammar)
+function expand_node(node, grammar, mem)
     # Checks in memory if the rules have already been enumerated once to save time.
     if mem[node.depth+1] == nothing
         enumerator = Herb.HerbSearch.ContextFreeEnumerator(grammar, node.depth+1, :START)
@@ -93,7 +93,12 @@ function backpropagate(node::TreeNode, result)
 end
 
 # Perform Monte Carlo Tree Search
-function mcts(root_state, max_iterations, grammar, c)
+function mcts(max_iterations, grammar, c)
+    # Initialize the memory array for the memoization of certain configuration.
+    mem = []
+    push!(mem, nothing)
+    # Generate the root node.
+    root_node = select_initial_state(grammar, 2, :START, mem)
     best_pipeline_score = 0 
     best_pipeline_conf = nothing
     for _ in 1:max_iterations
@@ -104,7 +109,7 @@ function mcts(root_state, max_iterations, grammar, c)
         end
         # Expansion
         if node.visits > 0
-            node = expand_node(node, grammar)
+            node = expand_node(node, grammar, mem)
         end
 
         # Simulation
@@ -121,7 +126,7 @@ function mcts(root_state, max_iterations, grammar, c)
 end
 
 # Creates an inital state to use as a starting point for the algorithm. 
-function select_initial_state(grammar, max_depth, start_symbol)
+function select_initial_state(grammar, max_depth, start_symbol, mem)
     initial_state = TreeNode(:EMPTY, 1, nothing)  # Create a root node with an empty symbol
     # Expand the root node by adding the first layer of options
     
@@ -142,11 +147,6 @@ function select_initial_state(grammar, max_depth, start_symbol)
     return initial_state
 end
 
-# Initialize the memory array for the memoization of certain configuration.
-mem = []
-push!(mem, nothing)
-# Generate the root node.
-root_node = select_initial_state(grammar, 2, :START)
 
 # Perform Monte Carlo Tree Search!
-best_pipeline = mcts(root_node, 1000, grammar, 1.42)
+best_pipeline = mcts(100, grammar, 1.42)
