@@ -1,5 +1,5 @@
 """constructs neighborhood given the pipeline and returns the best neighbor in its neighborhood"""
-function find_best_neighbour_in_neighbourhood(current_program, grammar, data, enumeration_depth, t_start, max_time, max_pipeline_depth, neighbours_per_iteration, print_statements=false)
+function find_best_neighbour_in_neighbourhood(current_program, grammar, data, enumeration_depth, max_pipeline_depth, neighbours_per_iteration, print_statements=false)
     # 1. Construct neighbourhood
     neighbourhood_node_loc, dict = Herb.HerbSearch.constructNeighbourhoodRuleSubset(current_program, grammar)
     replacement_expressions = Herb.HerbSearch.enumerate_neighbours_propose(enumeration_depth)(current_program, 
@@ -15,13 +15,6 @@ function find_best_neighbour_in_neighbourhood(current_program, grammar, data, en
     possible_program = current_program
     neighbours_tried = 0
     for replacement_expression in replacement_expressions
-        t_now = now()
-        if t_now - t_start > max_time
-            if print_statements
-                println("Timelimit reached")
-            end
-            break
-        end
         if (neighbours_tried % 5) == 0
             if print_statements
                 println("Tried ", neighbours_tried, " neighbours")
@@ -55,16 +48,12 @@ end
 
 
 """Very Large Neighborhood Search"""
-function vlns(grammar, data, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration=15, print_statements=false)
-    current_program = get_random_pipeline(grammar, max_initial_pipeline_depth, :START)
+function vlns(grammar, data, enumeration_depth, max_pipeline_depth, neighbours_per_iteration=15, print_statements=false)
+    current_program = get_random_pipeline(grammar, max_pipeline_depth, :START)
     println("start pipeline: ", current_program)
     current_cost = 1.1
     i = 0
-    not_improved_counter = 0
-    max_time = Dates.Millisecond(max_seconds * 1000)
-    t_start = now()
     while true
-        t_now = now()
         if pipelines_evaluated == max_pipelines
             if print_statements
                 println("max pipelines reached [vlns]")
@@ -75,19 +64,7 @@ function vlns(grammar, data, enumeration_depth, max_seconds, max_iterations_with
             println("Iteration: ", i)
         end
         previous_cost = current_cost
-        current_program, current_cost = find_best_neighbour_in_neighbourhood(current_program, grammar, data, enumeration_depth, t_start, max_time, max_pipeline_depth, neighbours_per_iteration, print_statements)
-
-        if current_cost == previous_cost
-            not_improved_counter += 1
-            if not_improved_counter == max_iterations_without_improvement
-                if print_statements
-                    println("Stopping because hasn't inproved in ", max_iterations_without_improvement, " iterations")
-                end
-                break
-            end
-        else
-            not_improved_counter = 0
-        end
+        current_program, current_cost = find_best_neighbour_in_neighbourhood(current_program, grammar, data, enumeration_depth, max_pipeline_depth, neighbours_per_iteration, print_statements)
 
         if current_cost == 0.0
             if print_statements

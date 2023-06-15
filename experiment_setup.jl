@@ -214,7 +214,7 @@ function pipeline_cost_function(pipeline, train_X, train_Y, test_X, test_Y)
 end
 
 """returns a string with information about the parameters"""
-function parameters_info_string(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration)
+function parameters_info_string(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_pipeline_depth, neighbours_per_iteration)
     result  = 
         "Search algorithm: " * uppercase(search_alg_name) * "\n" *
         "Datasets: " * string(dataset_ids) * "\n" *
@@ -223,10 +223,7 @@ function parameters_info_string(search_alg_name, dataset_ids, n_runs, grammar, e
 
         "Parameters: " * "\n" * 
         "enumeration_depth: " * string(enumeration_depth) * "\n" * 
-        "max_seconds: " * string(max_seconds) * "\n" * 
-        "max_iterations_without_improvement: " * string(max_iterations_without_improvement) * "\n" * 
         "max_pipeline_depth: " * string(max_pipeline_depth) * "\n" * 
-        "max_initial_pipeline_depth: " * string(max_initial_pipeline_depth) * "\n" *
         "neighbours_per_iteration (only vlns): " * string(neighbours_per_iteration) * "\n\n\n" *
         "Results: \n\n"
 
@@ -274,16 +271,13 @@ function run_search(
         dataset_ids,
         n_runs,
         grammar, 
-        enumeration_depth, 
-        max_seconds, 
-        max_iterations_without_improvement, 
-        max_pipeline_depth, 
-        max_initial_pipeline_depth,
+        enumeration_depth,
+        max_pipeline_depth,
         neighbours_per_iteration)
 
 
     # information about the runs
-    result_string = parameters_info_string(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration)
+    result_string = parameters_info_string(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_pipeline_depth, neighbours_per_iteration)
     results = Dict{Int, Any}()
 
     for dataset_id in dataset_ids
@@ -310,11 +304,11 @@ function run_search(
 
             start_time = now()
             if search_alg_name == "mh"
-                best_program, best_program_cost = mh(  grammar, data, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth)
+                best_program, best_program_cost = mh(  grammar, data, enumeration_depth, max_pipeline_depth)
             elseif search_alg_name == "vlns"
-                best_program, best_program_cost = vlns(grammar, data, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration)
+                best_program, best_program_cost = vlns(grammar, data, enumeration_depth, max_pipeline_depth, neighbours_per_iteration)
             elseif search_alg_name == "bfs"
-                best_program, best_program_cost = simple_enumerative_search(grammar, data, enumeration_depth, max_seconds)
+                best_program, best_program_cost = simple_enumerative_search(grammar, data, enumeration_depth)
             end
             end_time = now()
 
@@ -342,7 +336,7 @@ end
 """runs the search algorithm and saves the results to a file"""
 function run_and_save(filename)
     #run algorithm - don't touch this!! (change at the top instead)
-    result_string, results = run_search(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_seconds, max_iterations_without_improvement, max_pipeline_depth, max_initial_pipeline_depth, neighbours_per_iteration)
+    result_string, results = run_search(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_pipeline_depth, neighbours_per_iteration)
     println(result_string)
     
     #write result to file
@@ -361,26 +355,20 @@ foreach(rm, readdir("db_output",join=true))
 search_alg_name = "vlns"             # options: bfs, vlns, mh
 
 dataset_ids = [1499, 37, 1510, 1504]            # datasets: [seeds:1499, diabetes:37, wdbc:1510, steel-plates-fault:1504]
+dataset_ids = [61]            # datasets: [seeds:1499, diabetes:37, wdbc:1510, steel-plates-fault:1504]
 
 n_runs = 2
+max_pipelines = 10
 
-max_pipelines = 100
 
-# other parameters
-
-# optimize this
+# parameters to be optimized:
 enumeration_depth = 3
 max_pipeline_depth = 5
 neighbours_per_iteration = 15
-max_iterations_without_improvement = 10
 
 
-# don't optimize
-max_seconds = 300
-max_initial_pipeline_depth = max_pipeline_depth
 
-
-# save the avg costs in a new dict
+# create dict for saving results
 final_results = Dict()
 for id in dataset_ids
     final_results[id] = Dict("avg_accuracy" => [], "avg_sample_variance_accuracy" => [])
