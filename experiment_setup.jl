@@ -40,6 +40,7 @@ global max_pipelines = 0
 include("./search_algorithms/simple_enumerative_search.jl")
 include("./search_algorithms/metropolis_hastings.jl")
 include("./search_algorithms/vlns.jl")
+include("./search_algorithms/mcts.jl")
 
 # import the sk-learn functions
 @sk_import decomposition: (PCA)
@@ -275,7 +276,8 @@ function run_search(
         enumeration_depth,
         max_pipeline_depth,
         neighbours_per_iteration,
-        train_on_n_samples)
+        train_on_n_samples,
+        mcts_iterations)
 
 
     # information about the runs
@@ -311,6 +313,8 @@ function run_search(
                 best_program, best_program_cost = vlns(grammar, data, enumeration_depth, max_pipeline_depth, neighbours_per_iteration)
             elseif search_alg_name == "bfs"
                 best_program, best_program_cost = simple_enumerative_search(grammar, data, enumeration_depth)
+            elseif search_alg_name == "mcts"
+                best_program, best_program_cost = mcts(grammar, data, mcts_iterations, 1.42)
             end
             end_time = now()
 
@@ -338,7 +342,7 @@ end
 """runs the search algorithm and saves the results to a file"""
 function run_and_save(filename)
     #run algorithm - don't touch this!! (change at the top instead)
-    result_string, results = run_search(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_pipeline_depth, neighbours_per_iteration, train_on_n_samples)
+    result_string, results = run_search(search_alg_name, dataset_ids, n_runs, grammar, enumeration_depth, max_pipeline_depth, neighbours_per_iteration, train_on_n_samples, mcts_iterations)
     println(result_string)
     
     #write result to file
@@ -354,7 +358,7 @@ foreach(rm, readdir("db_output",join=true))
 
 ### set the right parameters here
 
-search_alg_name = "bfs"             # options: bfs, vlns, mh
+search_alg_name = "mcts"             # options: bfs, vlns, mh
 
 
 dataset_ids = [37, 44]                          # parameter selection: [diabetes:37, spambase:44]
@@ -363,7 +367,9 @@ dataset_ids = [37, 44]                          # parameter selection: [diabetes
 n_runs = 2
 max_pipelines = 10
 
-train_on_n_samples = 10     # to speed up evaluation, train only on n samples. To train on full dataset, set to 10000000
+train_on_n_samples = 10    # to speed up evaluation, train only on n samples. To train on full dataset, set to 10000000
+
+mcts_iterations = 600
 
 # parameters to be optimized:
 enumeration_depth = 3

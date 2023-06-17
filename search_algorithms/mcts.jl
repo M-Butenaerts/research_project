@@ -19,7 +19,7 @@ end
 
 # Select the child node with the highest UCT score.
 function select_child(node::TreeNode, c)
-    total_visits = sum(n.visits for n in values(node.children))
+    total_visits = sum(n.visits for n in node.children)
     best_score = -Inf
     best_child = nothing
 
@@ -70,12 +70,12 @@ function expand_node(node, grammar, mem)
 end
 
 # The simulation step tries to evaluate a pipeline and returns its accuracy.
-function simulate(state)
+function simulate(state, data)
     accuracy = 0
     try
         #pipeline = eval(Herb.HerbSearch.rulenode2expr(state, grammar))
         pipeline = eval(Meta.parse(insert_name_indexes(string(Herb.HerbSearch.rulenode2expr(state, grammar)))))
-        accuracy = evaluate_pipeline(pipeline, train_X, train_Y, test_X, test_Y)
+        accuracy = evaluate_pipeline(pipeline, data[1], data[2], data[3], data[4])
         #println("Accuracy: ", accuracy)
     catch
         accuracy = 0
@@ -93,7 +93,7 @@ function backpropagate(node::TreeNode, result)
 end
 
 # Perform Monte Carlo Tree Search
-function mcts(max_iterations, grammar, c)
+function mcts(grammar, data, max_iterations, c)
     # Initialize the memory array for the memoization of certain configuration.
     mem = []
     push!(mem, nothing)
@@ -113,7 +113,7 @@ function mcts(max_iterations, grammar, c)
         end
 
         # Simulation
-        reward = simulate(node.state)
+        reward = simulate(node.state, data)
         if reward > best_pipeline_score
             best_pipeline_score = reward
             best_pipeline_conf = node.state
@@ -122,7 +122,9 @@ function mcts(max_iterations, grammar, c)
         # Backpropagation
         backpropagate(node, reward)
     end
-    return best_pipeline_conf, best_pipeline_score
+
+    best_cost = 1 - best_pipeline_score
+    return best_pipeline_conf, best_cost
 end
 
 # Creates an inital state to use as a starting point for the algorithm. 
