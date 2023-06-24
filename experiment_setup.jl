@@ -41,6 +41,8 @@ include("./search_algorithms/simple_enumerative_search.jl")
 include("./search_algorithms/metropolis_hastings.jl")
 include("./search_algorithms/vlns.jl")
 include("./search_algorithms/mcts.jl")
+include("./search_algorithms/a_star.jl")
+
 
 # import the sk-learn functions
 @sk_import decomposition: (PCA)
@@ -114,7 +116,7 @@ grammar = Herb.HerbGrammar.@cfgrammar begin
         ("DecisionTree", DecisionTreeClassifier()) |
         ("RandomForest", RandomForestClassifier()) |
         ("Gradient Boosting Classifier", GradientBoostingClassifier()) |
-        ("LogisticRegression", LogisticRegression()) #|
+        ("LogisticRegression", LogisticRegression()) |
         ("KNearestNeighbors", KNeighborsClassifier())
 end
 
@@ -315,6 +317,8 @@ function run_search(
                 best_program, best_program_cost = simple_enumerative_search(grammar, data, enumeration_depth)
             elseif search_alg_name == "mcts"
                 best_program, best_program_cost = mcts(grammar, data, mcts_iterations, 1.42)
+            elseif search_alg_name == "astar"
+                best_program, best_program_cost = a_star(grammar, data, enumeration_depth, dataset_id, max_pipelines, i)
             end
             end_time = now()
 
@@ -358,16 +362,16 @@ foreach(rm, readdir("db_output",join=true))
 
 ### set the right parameters here
 
-search_alg_name = "mcts"             # options: bfs, vlns, mh
+search_alg_name = "astar"             # options: bfs, vlns, mh
 
+# dataset_ids = [61]
+# dataset_ids = [37, 44]                          # parameter selection: [diabetes:37, spambase:44]
+dataset_ids = [1499, 1510, 1504, 1478]          # evaluation: [seeds:1499, wdbc:1510, steel-plates-fault:1504, har:1478]
 
-dataset_ids = [37, 44]                          # parameter selection: [diabetes:37, spambase:44]
-# dataset_ids = [1499, 1510, 1504, 1478]          # evaluation: [seeds:1499, wdbc:1510, steel-plates-fault:1504, har:1478]
+n_runs = 10
+max_pipelines = 100
 
-n_runs = 2
-max_pipelines = 10
-
-train_on_n_samples = 10    # to speed up evaluation, train only on n samples. To train on full dataset, set to 10000000
+train_on_n_samples = 300    # to speed up evaluation, train only on n samples. To train on full dataset, set to 10000000
 
 mcts_iterations = 600
 
