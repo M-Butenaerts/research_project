@@ -39,6 +39,7 @@ global max_pipelines = 0
 # import the search algorithms
 include("./search_algorithms/simple_enumerative_search.jl")
 include("./search_algorithms/metropolis_hastings.jl")
+include("./search_algorithms/genetic_algorithm.jl")
 include("./search_algorithms/vlns.jl")
 
 # import the sk-learn functions
@@ -87,8 +88,8 @@ grammar = Herb.HerbGrammar.@cfgrammar begin
     
     # multiple classifiers possible
     START   = Pipeline([CLASSIF]) | Pipeline([PRE, CLASSIF])
-    PRE     = PREPROC | FSELECT | ("seq", Pipeline([PRE, PRE]))  | ("par", FeatureUnion([BRANCH, BRANCH])) 
-    BRANCH  = PRE | CLASSIF | ("seq", Pipeline([PRE, CLASSIF]))
+    PRE     = PREPROC | FSELECT | ("seq", Pipeline([PRE, PRE]))  | ("par", FeatureUnion([PRE, PRE])) 
+    # BRANCH  = PRE | CLASSIF | ("seq", Pipeline([PRE, CLASSIF]))
 
     # preprocessing functions
     PREPROC =   
@@ -113,7 +114,7 @@ grammar = Herb.HerbGrammar.@cfgrammar begin
         ("DecisionTree", DecisionTreeClassifier()) |
         ("RandomForest", RandomForestClassifier()) |
         ("Gradient Boosting Classifier", GradientBoostingClassifier()) |
-        ("LogisticRegression", LogisticRegression()) #|
+        ("LogisticRegression", LogisticRegression()) 
         ("KNearestNeighbors", KNeighborsClassifier())
 end
 
@@ -182,7 +183,7 @@ output: accuracy of pipeline
 """
 function evaluate_pipeline(pipeline, train_X, train_Y, test_X, test_Y)
     global pipelines_evaluated += 1
-    println(pipelines_evaluated)
+    println(pipelines_evaluated)    
 
     if pipelines_evaluated > max_pipelines
         return 0.0
@@ -194,10 +195,8 @@ function evaluate_pipeline(pipeline, train_X, train_Y, test_X, test_Y)
         try
             # fit the pipeline
             model = ScikitLearn.fit!(pipeline, Matrix(train_X), Array(train_Y))
-
             # make predictions
             predictions = ScikitLearn.predict(model, Matrix(test_X))
-
             # measure the accuracy
             accuracy = mean(predictions .== test_Y)
             return accuracy
@@ -294,6 +293,7 @@ function run_search(
         dataset = get_dataset(dataset_id)
         # run the search algorithm n_runs times
         for i in range(1, n_runs)
+            
             # get train-test splits
             # Shuffle and split the dataset
             train_X, train_Y, val_X, val_Y, test_X, test_Y = split_dataset(dataset)
@@ -311,6 +311,8 @@ function run_search(
                 best_program, best_program_cost = vlns(grammar, data, enumeration_depth, max_pipeline_depth, neighbours_per_iteration)
             elseif search_alg_name == "bfs"
                 best_program, best_program_cost = simple_enumerative_search(grammar, data, enumeration_depth)
+            elseif search_alg_name == "ga"
+                best_program, best_program_cost = genetic_algorithm(grammar, data, enumeration_depth, max_pipeline_depth, 0.1, 0.1)
             end
             end_time = now()
 
